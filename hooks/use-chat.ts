@@ -21,14 +21,14 @@ let globalSocketInitialized = false;
 function getSocketStore(): SocketStore {
   if (!globalSocketStore) {
     console.log('[SocketStore] Creating new SocketStore instance');
-    globalSocketStore = new SocketStore({ baseURL: 'https://app.chatium.io' });
+    globalSocketStore = new SocketStore({ baseURL: 'https://app.msk.chatium.io/' });
   }
   
   // Инициализируем соединение один раз
   if (!globalSocketInitialized) {
     globalSocketInitialized = true;
-    console.log('[SocketStore] Initializing connection to https://app.chatium.io');
-    globalSocketStore.setBaseURL('https://app.chatium.io');
+    console.log('[SocketStore] Initializing connection to https://app.msk.chatium.io/');
+    globalSocketStore.setBaseURL('https://app.msk.chatium.io/');
     
     // Добавляем обработчики для отладки
     if (globalSocketStore._io) {
