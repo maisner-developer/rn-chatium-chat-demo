@@ -1,0 +1,13 @@
+{
+  "name": "@chatium/socket",
+  "main": "SocketClient.js",
+  "version": "12.0.0",
+  "peerDependencies": {
+    "nanoid": "*",
+    "socket.io-client": "*"
+  },
+  "publishConfig": {
+    "registry": "https://npm.chatium.io"
+  },
+  "gitHead": "00c1d81727ecf60a76880f5116a6109d2a29a823"
+}

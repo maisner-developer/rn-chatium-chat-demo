@@ -1,98 +1,255 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { useChat } from '@/hooks/use-chat';
+import type { ChatConfig, ChatMessage as ChatMessageType } from '@/types/chat';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function HomeScreen() {
+const API_URL = 'https://buhuber.chatium.ru/chat-demo/rn-api/get-chat';
+const COOKIE = 'at-3811=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjdESmpRME9NNmhmaHppQk1pZWUwYnVodWIiLCJpYXQiOjE3NjcyODU5MDZ9.7iiUHdDXZHDG2GCxxNMNSW9rqQKjTwCa-I_5RLaT-jw';
+
+export default function ChatScreen() {
+  const [chatConfig, setChatConfig] = useState<ChatConfig | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const flatListRef = useRef<FlatList>(null);
+
+  const {
+    messages,
+    loading,
+    error,
+    sendMessage,
+    loadMoreMessages,
+    hasMoreMessages,
+    typingNames,
+    updateTyping,
+  } = useChat({ chatConfig, cookie: COOKIE });
+
+  // Загрузка конфигурации чата
+  const loadChatConfig = useCallback(async () => {
+    setConfigLoading(true);
+    setConfigError(null);
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'GET',
+        headers: {
+          Cookie: COOKIE,
+        },
+        credentials: "omit",
+      });
+
+      const data = await response.json();
+      console.log('Chat config response:', JSON.stringify(data, null, 2));
+
+      if (data.success && data.chat) {
+        setChatConfig(data as ChatConfig);
+      } else {
+        setConfigError(`Ответ: ${JSON.stringify(data)}`);
+      }
+    } catch (err) {
+      setConfigError(String(err));
+    } finally {
+      setConfigLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadChatConfig();
+  }, [loadChatConfig]);
+
+  // Рендер сообщения
+  const renderMessage = useCallback(({ item }: { item: ChatMessageType }) => {
+    const isOwn = item.author?.id === chatConfig?.chat.current_author?.id || item.isOutgoing;
+    return <ChatMessage message={item} isOwn={!!isOwn} />;
+  }, [chatConfig]);
+
+  // Ключ для элемента списка
+  const keyExtractor = useCallback((item: ChatMessageType) => item.id, []);
+
+  // Разделитель между сообщениями
+  const ItemSeparator = useCallback(() => <View style={styles.separator} />, []);
+
+  // Индикатор загрузки старых сообщений
+  const ListFooterComponent = useCallback(() => {
+    if (!hasMoreMessages) return null;
+    return (
+      <View style={styles.loadingMore}>
+        <ActivityIndicator size="small" />
+      </View>
+    );
+  }, [hasMoreMessages]);
+
+  // Typing indicator
+  const TypingIndicator = useCallback(() => {
+    if (typingNames.length === 0) return null;
+    return (
+      <View style={styles.typingContainer}>
+        <ThemedText style={styles.typingText}>
+          {typingNames.join(', ')} {typingNames.length === 1 ? 'печатает' : 'печатают'}...
+        </ThemedText>
+      </View>
+    );
+  }, [typingNames]);
+
+  // Загрузка конфигурации
+  if (configLoading) {
+    return (
+      <ThemedView style={styles.centerContainer}>
+        <ActivityIndicator size="large" />
+        <ThemedText style={styles.loadingText}>Загрузка чата...</ThemedText>
+      </ThemedView>
+    );
+  }
+
+  // Ошибка загрузки конфигурации
+  if (configError || !chatConfig) {
+    return (
+      <ThemedView style={styles.centerContainer}>
+        <ThemedText style={styles.errorText}>Ошибка: {configError}</ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <ThemedView style={styles.header}>
+          <ThemedText type="subtitle">Чат</ThemedText>
+          {chatConfig.chat.current_author && (
+            <ThemedText style={styles.authorInfo}>
+              Вы: {chatConfig.chat.current_author.name}
+            </ThemedText>
+          )}
+        </ThemedView>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        {error && (
+          <View style={styles.errorBanner}>
+            <ThemedText style={styles.errorBannerText}>{error}</ThemedText>
+          </View>
+        )}
+
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={keyExtractor}
+          ItemSeparatorComponent={ItemSeparator}
+          ListFooterComponent={ListFooterComponent}
+          inverted={chatConfig.chat.render_inverted}
+          contentContainerStyle={styles.messagesList}
+          onEndReached={loadMoreMessages}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading && messages.length > 0}
+              onRefresh={loadChatConfig}
+            />
+          }
+          ListEmptyComponent={
+            loading ? (
+              <View style={styles.emptyContainer}>
+                <ActivityIndicator size="large" />
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <ThemedText style={styles.emptyText}>Нет сообщений</ThemedText>
+              </View>
+            )
+          }
+        />
+
+        <TypingIndicator />
+
+        <ChatInput
+          onSend={sendMessage}
+          onTyping={updateTyping}
+          disabled={!chatConfig.chat.messages_add_url}
+        />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    padding: 20,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(128, 128, 128, 0.2)',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  authorInfo: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginTop: 4,
+  },
+  loadingText: {
+    marginTop: 12,
+    opacity: 0.6,
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+  },
+  errorBanner: {
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  errorBannerText: {
+    color: 'red',
+    fontSize: 12,
+  },
+  messagesList: {
+    paddingVertical: 8,
+  },
+  separator: {
+    height: 2,
+  },
+  loadingMore: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  typingContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  typingText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    opacity: 0.6,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    opacity: 0.5,
   },
 });
