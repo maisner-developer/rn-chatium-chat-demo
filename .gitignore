@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# VsCode
+.vscode/
+
 # Native
 .kotlin/
 *.orig.*
@@ -41,3 +44,11 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+firebase-service-account*.json
+
+# EAS
+eas.json.backup
